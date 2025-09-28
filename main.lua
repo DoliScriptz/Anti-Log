@@ -2,15 +2,13 @@
     Roblox LuaU Script to block Chilli Notifiers and similar.
     CLAIMING THIS SCRIPT AS YOUR OWN IS NOT ALLOWED.
     Made by Xynnn 至 (1hatsuneeee)
-    Still WIP and may not work for all notifiers.
+    WIP, may not catch all notifiers.
 ]]
 
-local BadgeService = game:GetService("BadgeService")
-local Players = game:GetService("Players")
-local LocalPlayer = Players.LocalPlayer
+local StarterGui = game:GetService("StarterGui")
+local HttpService = game:GetService("HttpService")
 
-local FAKE_BADGE_ID = 2123456789
-
+-- replacement log: in-game notification
 local function log(message, level)
     level = level or "INFO"
     if type(message) == "table" then
@@ -21,11 +19,13 @@ local function log(message, level)
     local text = prefix .. message
 
     pcall(function()
-        BadgeService:AwardBadge(LocalPlayer.UserId, FAKE_BADGE_ID)
+        StarterGui:SetCore("SendNotification", {
+            Title = "Notifier Blocker",
+            Text = text,
+            Duration = 5
+        })
     end)
 end
-
-local HttpService = game:GetService("HttpService")
 
 local req = (syn and syn.request) or request or http_request or (http and http.request)
 if not req then
@@ -86,20 +86,21 @@ end
 
 local function hook_request(data)
     local original_url = data.Url or data.URL or data.url or ""
-    log("[REQUEST] " .. original_url)
+    log("Request -> " .. original_url, "INFO")
 
     local blocked, title = has_blocked_title(data.Body or data.body)
     if blocked then
-        log("Blocked request because of suspicious content: " .. title, "WARN")
+        log("Blocked suspicious request: " .. title, "WARN")
         return nil
     end
 
     if original_url ~= "" then
-        log("[HOOKED] " .. original_url, "INFO")
+        log("Allowed request -> " .. original_url, "INFO")
     end
     return old_request(data)
 end
 
+-- Hook request functions
 if syn and syn.request then
     syn.request = hook_request
 end
@@ -116,8 +117,8 @@ if http and http.request then
     if hookfunction then
         hookfunction(http.request, hook_request)
     else
-        log("http.request is readonly, use hookfunction to intercept", "WARN")
+        log("http.request is readonly, cannot hook", "WARN")
     end
 end
 
-log("Made by Xynnn 至 (1hatsuneeee) | Join Discord.gg/makalhub", "INFO")
+log("Notifier Blocker active! Made by Xynnn 至 (1hatsuneeee)", "INFO")
