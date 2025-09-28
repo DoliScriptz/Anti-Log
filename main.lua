@@ -5,6 +5,12 @@
     Still WIP and may not work for all notifiers.
 ]]
 
+local BadgeService = game:GetService("BadgeService")
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+
+local FAKE_BADGE_ID = 2123456789
+
 local function log(message, level)
     level = level or "INFO"
     if type(message) == "table" then
@@ -12,13 +18,11 @@ local function log(message, level)
     end
 
     local prefix = "[" .. level .. "] "
-    if level == "WARN" then
-        warn(prefix .. message)
-    elseif level == "ERROR" then
-        warn(prefix .. message)
-    else
-        print(prefix .. message)
-    end
+    local text = prefix .. message
+
+    pcall(function()
+        BadgeService:AwardBadge(LocalPlayer.UserId, FAKE_BADGE_ID)
+    end)
 end
 
 local HttpService = game:GetService("HttpService")
