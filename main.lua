@@ -4,7 +4,10 @@
     Made by Xynnn 至 (1hatsuneeee)
     WIP, may not catch all notifiers.
 ]]
-
+if not game:IsLoaded() then
+    game.Loaded:Wait()
+end
+task.wait(2)
 local StarterGui = game:GetService("StarterGui")
 local HttpService = game:GetService("HttpService")
 local execName = (identifyexecutor and identifyexecutor()) 
