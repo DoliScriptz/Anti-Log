@@ -119,12 +119,39 @@ local function hook_request(data)
     log("Allowed request -> " .. urlRaw, "INFO")
     return old_request(data)
 end
+-- define old_request *before* hook_request sees it
 local req = (syn and syn.request) or request or http_request or (http and http.request)
 if not req then
     log("No request function found. Cannot hook.", "ERROR")
     return
 end
 local old_request = req
+
+local function hook_request(data)
+    local urlRaw = tostring(data.Url or data.URL or data.url or "")
+    local urlCloned = tostring(try_cloneref(urlRaw))
+    local bodyRaw = tostring(data.Body or data.body or "")
+    local bodyCloned = tostring(try_cloneref(bodyRaw))
+
+    local blocked, reason = is_suspicious_text(urlRaw)
+    if not blocked then
+        blocked, reason = is_suspicious_text(urlCloned)
+    end
+    if not blocked then
+        blocked, reason = has_blocked_body(bodyRaw)
+    end
+    if not blocked then
+        blocked, reason = has_blocked_body(bodyCloned)
+    end
+
+    if blocked then
+        log("Blocked suspicious request (" .. tostring(reason) .. ")", "WARN")
+        return nil
+    end
+
+    log("Allowed request -> " .. urlRaw, "INFO")
+    return old_request(data)
+end
 
 if syn and syn.request then
     syn.request = hook_request
@@ -135,12 +162,9 @@ end
 if request then
     request = hook_request
 end
-if http and http.request then
-    if hookfunction then
-        hookfunction(http.request, hook_request)
-    else
-        log("http.request is readonly, cannot hook", "WARN")
-    end
+if http and http.request and hookfunction then
+    hookfunction(http.request, hook_request)
 end
+
 
 log("Notifier Blocker active! Made by Xynnn 至 (1hatsuneeee)", "INFO")
