@@ -7,6 +7,13 @@
 
 local StarterGui = game:GetService("StarterGui")
 local HttpService = game:GetService("HttpService")
+local execName = (identifyexecutor and identifyexecutor()) 
+              or (getexecutorname and getexecutorname()) 
+              or "Unknown"
+
+if execName == "Xeno" or execName == "Solara" then
+    return
+end
 
 local function log(message, level)
     level = level or "INFO"
