@@ -20,66 +20,71 @@ local function log(message, level)
     if type(message) == "table" then
         message = message.message or tostring(message)
     end
-
     local prefix = "[" .. level .. "] "
-    local text = prefix .. message
-
     pcall(function()
         StarterGui:SetCore("SendNotification", {
             Title = "Notifier Blocker",
-            Text = text,
+            Text = prefix .. message,
             Duration = 5
         })
     end)
 end
-
-local req = (syn and syn.request) or request or http_request or (http and http.request)
-if not req then
-    log("No request function found. Cannot hook.", "ERROR")
-    return
-end
-
-local old_request = req
-
-local function has_blocked_title(body)
-    if type(body) ~= "string" then
-        return false
+local function try_cloneref(val)
+    if type(cloneref) == "function" then
+        local ok, out = pcall(cloneref, val)
+        if ok then return out end
     end
-
+    if type(syn) == "table" and type(syn.cloneref) == "function" then
+        local ok, out = pcall(syn.cloneref, val)
+        if ok then return out end
+    end
+    if type(http) == "table" and type(http.cloneref) == "function" then
+        local ok, out = pcall(http.cloneref, val)
+        if ok then return out end
+    end
+    return val
+end
+local function is_suspicious_text(str)
+    if type(str) ~= "string" then return false end
+    str = str:lower()
+    local bad = {
+        "discord.com/api/webhooks",
+        "notify",
+        "notifier",
+        "hub",
+        "brainrot",
+        "chillihub1.github.io",
+        "fern.wtf/joiner",
+        "github",
+        "job id",
+        "click to join",
+        "game:getservice"
+    }
+    for _, word in ipairs(bad) do
+        if str:find(word, 1, true) then
+            return true, word
+        end
+    end
+    return false
+end
+local function has_blocked_body(body)
+    if type(body) ~= "string" then return false end
     local ok, decoded = pcall(HttpService.JSONDecode, HttpService, body)
     if not ok or type(decoded) ~= "table" then
-        return false
+        return is_suspicious_text(body)
     end
 
     if decoded.embeds then
         for _, embed in ipairs(decoded.embeds) do
-            if type(embed.title) == "string" then
-                local t = embed.title:lower()
-                if t:find("notify") or t:find("hub") or t:find("notifier") or t:find("pet") or t:find("brainrot") then
-                    return true, embed.title
-                end
-            end
-
-            if type(embed.description) == "string" then
-                local d = embed.description:lower()
-                if d:find("notify") or d:find("hub") then
-                    return true, embed.description
-                end
-            end
-
-            if type(embed.fields) == "table" then
-                for _, field in ipairs(embed.fields) do
-                    if type(field.name) == "string" then
-                        local fn = field.name:lower()
-                        if fn:find("job id") or fn:find("join") or fn:find("script") then
-                            return true, field.name
-                        end
-                    end
-                    if type(field.value) == "string" then
-                        local fv = field.value:lower()
-                        if fv:find("job id") or fv:find("click to join") or fv:find("game:getservice")
-                           or fv:find("chillihub1.github.io") or fv:find("fern.wtf/joiner") or fv:find("github") then
-                            return true, field.value
+            for k, v in pairs(embed) do
+                if type(v) == "string" then
+                    local bad, match = is_suspicious_text(v)
+                    if bad then return true, match end
+                elseif type(v) == "table" then
+                    for _, sub in pairs(v) do
+                        if type(sub) == "string" then
+                            local bad, match = is_suspicious_text(sub)
+                            if bad then return true, match end
                         end
                     end
                 end
@@ -91,34 +96,42 @@ local function has_blocked_title(body)
 end
 
 local function hook_request(data)
-    local original_url = data.Url or data.URL or data.url or ""
-    log("Request -> " .. original_url, "INFO")
+    local urlRaw = tostring(data.Url or data.URL or data.url or "")
+    local urlCloned = tostring(try_cloneref(urlRaw))
+    local bodyRaw = tostring(data.Body or data.body or "")
+    local bodyCloned = tostring(try_cloneref(bodyRaw))
 
-    local blocked, title = has_blocked_title(data.Body or data.body)
+    local blocked, reason =
+        is_suspicious_text(urlRaw) or is_suspicious_text(urlCloned)
+    if not blocked then
+        blocked, reason =
+            has_blocked_body(bodyRaw) or has_blocked_body(bodyCloned)
+    end
+
     if blocked then
-        log("Blocked suspicious request: " .. title, "WARN")
+        log("Blocked suspicious request (" .. reason .. ")", "WARN")
         return nil
     end
 
-    if original_url ~= "" then
-        log("Allowed request -> " .. original_url, "INFO")
-    end
+    log("Allowed request -> " .. urlRaw, "INFO")
     return old_request(data)
 end
+local req = (syn and syn.request) or request or http_request or (http and http.request)
+if not req then
+    log("No request function found. Cannot hook.", "ERROR")
+    return
+end
+local old_request = req
 
--- Hook request functions
 if syn and syn.request then
     syn.request = hook_request
 end
-
 if http_request then
     http_request = hook_request
 end
-
 if request then
     request = hook_request
 end
-
 if http and http.request then
     if hookfunction then
         hookfunction(http.request, hook_request)
