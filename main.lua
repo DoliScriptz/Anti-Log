@@ -8,7 +8,6 @@
 local StarterGui = game:GetService("StarterGui")
 local HttpService = game:GetService("HttpService")
 
--- replacement log: in-game notification
 local function log(message, level)
     level = level or "INFO"
     if type(message) == "table" then
